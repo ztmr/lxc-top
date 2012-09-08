@@ -1,7 +1,7 @@
 require 'ubygems'
 require 'terminal-table/import'
 
-CGROUPFS = "/cgroup"
+CGROUPFS = "/sys/fs/cgroup"
 
 $cgroups = {}
 def read_values!(path = '/')
@@ -15,7 +15,7 @@ def read_values!(path = '/')
   mem_usage = IO.readlines(fpath + '/memory.usage_in_bytes').to_s.to_i
   memsw_usage = IO.readlines(fpath + '/memory.memsw.usage_in_bytes').to_s.to_i
   cpu_elapsed = IO.readlines(fpath + '/cpuacct.usage').to_s.to_f / 1E9
-  cpu_usage = cpu_elapsed - ($cgroups[path] && $cgroups[path][:cpu] || cpu_elapsed)
+  cpu_usage = cpu_elapsed - ($old_cgroups[path] && $old_cgroups[path][:cpu] || cpu_elapsed)
 
   $cgroups[path] = { :tasks => tasks.length,
     :mem => mem_usage,
@@ -54,7 +54,16 @@ def display!
              })
 end
 
+["INT","TERM", "TRAP", "USR1", "HUP"].each { |sig|
+  Signal.trap(sig) do
+    exit
+  end
+}
+
 loop do
+  $old_cgroups = $cgroups
+  $cgroups = {}
+  puts "\e[H\e[2J"
   last_tick = Time.now.to_f
   read_values!
   #p $cgroups
